@@ -2,7 +2,10 @@
 // context. Uses `stash` for model persistence. Models are expected to
 // have a URL prefixed by their respective collection (e.g. `/{class}/{id}`)
 // and Collections retrieve their respective models based on this convention.
-var _ = require('underscore');
+var _ = require('underscore'),
+    jQuery = require('jquery');
+
+
 
 module.exports = function(filepath) {
     var stash = require('stash')(filepath);
@@ -21,49 +24,57 @@ module.exports = function(filepath) {
     var sync = function(method, model, options) {
         var options = options || {};
 
-        var success = options.success,
-            error = options.error;
+        var defer = jQuery.Deferred();
+        defer.done(options.success).fail(options.error);
 
-        switch (method) {
-        case 'read':
-            var data,
-                base = stash.key(getUrl(model));
-            if (model.id) {
-                data = stash.get(base);
-                return data ? success(data) : error('Model not found.');
-            } else {
-                data = [];
-                _.each(stash.list(), function(val, key) {
-                    val && key.indexOf(base) === 0 && data.push(val);
-                });
-                return success(data);
-            }
-            break;
-        case 'create':
-        case 'update':
-            if (_.isEqual(stash.get(getUrl(model)), model.toJSON())) {
-                return success({});
-            }
-            stash.set(
-                getUrl(model),
-                model.toJSON(),
-                function(err) {
-                    return err ? error(err) : success({});
+        var success = defer.resolve,
+            error = defer.reject;
+
+        // what a miserable way to do this.
+        (function(){
+            switch (method) {
+            case 'read':
+                var data,
+                    base = stash.key(getUrl(model));
+                if (model.id) {
+                    data = stash.get(base);
+                    return data ? success(data) : error('Model not found.');
+                } else {
+                    data = [];
+                    _.each(stash.list(), function(val, key) {
+                        val && key.indexOf(base) === 0 && data.push(val);
+                    });
+                    return success(data);
                 }
-            );
-            break;
-        case 'delete':
-            if (typeof stash.get(getUrl(model)) === 'undefined') {
-                return success({});
-            }
-            stash.rm(
-                getUrl(model),
-                function(err) {
-                    return err ? error(err) : success({});
+                break;
+            case 'create':
+            case 'update':
+                if (_.isEqual(stash.get(getUrl(model)), model.toJSON())) {
+                    return success({});
                 }
-            );
-            break;
-        }
+                stash.set(
+                    getUrl(model),
+                    model.toJSON(),
+                    function(err) {
+                        return err ? error(err) : success({});
+                    }
+                );
+                break;
+            case 'delete':
+                if (typeof stash.get(getUrl(model)) === 'undefined') {
+                    return success({});
+                }
+                stash.rm(
+                    getUrl(model),
+                    function(err) {
+                        return err ? error(err) : success({});
+                    }
+                );
+                break;
+            }
+        })();
+
+        return defer.promise();
     };
 
     return { stash: stash, sync: sync };
