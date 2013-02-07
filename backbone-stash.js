@@ -38,36 +38,36 @@ module.exports = function(filepath) {
                     base = stash.key(getUrl(model));
                 if (model.id) {
                     data = stash.get(base);
-                    return data ? success(data) : error('Model not found.');
+                    return data ? success(model, data, options) : error('Model not found.');
                 } else {
                     data = [];
                     _.each(stash.list(), function(val, key) {
                         val && key.indexOf(base) === 0 && data.push(val);
                     });
-                    return success(data);
+                    return success(model, data, options);
                 }
                 break;
             case 'create':
             case 'update':
                 if (_.isEqual(stash.get(getUrl(model)), model.toJSON())) {
-                    return success({});
+                    return success(model, {}, options);
                 }
                 stash.set(
                     getUrl(model),
                     model.toJSON(),
                     function(err) {
-                        return err ? error(err) : success({});
+                        return err ? error(model, err, options) : success(model, {}, options);
                     }
                 );
                 break;
             case 'delete':
                 if (typeof stash.get(getUrl(model)) === 'undefined') {
-                    return success({});
+                    return success(model, {}, options);
                 }
                 stash.rm(
                     getUrl(model),
                     function(err) {
-                        return err ? error(err) : success({});
+                        return err ? error(model, err, options) : success(model, {}, options);
                     }
                 );
                 break;
